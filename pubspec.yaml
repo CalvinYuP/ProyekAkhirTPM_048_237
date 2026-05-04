@@ -1,0 +1,79 @@
+name: jogjaethnotrip2
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+  flutter_localization: ^0.1.0
+
+  # Routing
+  go_router: ^14.2.0
+
+  # Local Storage
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # Networking & API
+  dio: ^5.7.0
+
+  # Utils & Helpers
+  intl: ^0.20.2
+  shared_preferences: ^2.3.0
+  uuid: ^4.5.0
+
+  # Location & Maps
+  geolocator: ^13.0.1
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
+  # Audio & Sensors
+  audioplayers: ^6.1.0
+  sensors_plus: ^6.0.0
+
+  # UI & Animation
+  lottie: ^3.1.2
+  flutter_staggered_animations: ^1.1.1
+  shimmer: ^3.0.0
+  cached_network_image: ^3.4.1
+
+  # Others
+  share_plus: ^10.0.0
+  image_picker: ^1.1.2
+  permission_handler: ^11.3.1
+  flutter_local_notifications: ^17.2.3
+  timezone: ^0.9.4
+  crypto: ^3.0.3
+  local_auth: ^2.3.0
+  url_launcher: ^6.2.5
+  flutter_localizations:
+    sdk: flutter
+  flutter_dotenv: ^6.0.1
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.4.11
+  riverpod_generator: ^2.4.0
+  freezed: ^2.5.2
+  json_serializable: ^6.8.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
+    - assets/data/destinations.json
+    - assets/images/
+    - assets/images/destinations/
+    - assets/images/user_profile/
+    - assets/images/motif_batik/
+    - assets/svg/
+    - assets/audio/
