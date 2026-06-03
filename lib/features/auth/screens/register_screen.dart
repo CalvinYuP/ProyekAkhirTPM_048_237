@@ -38,14 +38,52 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       _emailController.text.trim(),
     );
 
-    // ignore: use_build_context_synchronously
+    if (!mounted) return;
     CustomDialog.hideLoading(context);
 
-    if (success && mounted) {
-      CustomDialog.showSuccess(context, 'Akun berhasil dibuat! Silakan login.');
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) context.pop();
-      });
+    if (success) {
+      // ✅ Tutup loading dialog dulu
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+
+      // ✅ Tampilkan SnackBar sukses
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Text('Akun berhasil dibuat! Mengalihkan ke login...'),
+              ],
+            ),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 2),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+
+      // ✅ Tunggu sebentar lalu redirect ke login
+      await Future.delayed(const Duration(seconds: 2));
+
+      if (!mounted) return;
+
+      // ✅ REDIRECT KE LOGIN - Gunakan GoRouter langsung
+      // Pop semua route sampai ke root, lalu ganti dengan /auth
+      final router = GoRouter.of(context);
+      
+      // Pop semua halaman yang ada di stack
+      while (router.canPop()) {
+        router.pop();
+      }
+      
+      // Ganti dengan halaman login
+      router.go('/auth');
+      
     } else if (mounted) {
       CustomDialog.showError(context, 'Username atau Email sudah terdaftar.');
     }
@@ -70,7 +108,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       appBar: AppBar(
         title: const Text('Daftar Akun'),
         backgroundColor: AppColors.secondary,
-        foregroundColor: AppColors.primary,
+        foregroundColor: AppColors.primaryLight,
         elevation: 0,
       ),
       body: SafeArea(
@@ -85,7 +123,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 Center(
                   child: Container(
                     width: 80, height: 80,
-                    decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.primary.withValues(alpha: 0.2)),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.primary.withValues(alpha: 0.2),
+                    ),
                     child: const Icon(Icons.person_add, size: 40, color: AppColors.primary),
                   ),
                 ),
@@ -94,7 +135,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 // Username
                 TextFormField(
                   controller: _usernameController,
-                  decoration: const InputDecoration(labelText: 'Username', prefixIcon: Icon(Icons.person_outline, color: AppColors.primary), border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    labelText: 'Username',
+                    prefixIcon: Icon(Icons.person_outline, color: AppColors.primary),
+                    border: OutlineInputBorder(),
+                  ),
                   validator: (v) => (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
                 ),
                 const SizedBox(height: 16),
@@ -103,7 +148,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email_outlined, color: AppColors.primary), border: OutlineInputBorder(), helperText: 'Digunakan untuk reset password'),
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    prefixIcon: Icon(Icons.email_outlined, color: AppColors.primary),
+                    border: OutlineInputBorder(),
+                    helperText: 'Digunakan untuk reset password',
+                  ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Wajib diisi';
                     if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(v)) return 'Format email salah';
@@ -120,16 +170,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     labelText: 'Password',
                     prefixIcon: const Icon(Icons.lock_outline, color: AppColors.primary),
                     suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: AppColors.primary),
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                        color: AppColors.primary,
+                      ),
                       onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                     ),
                     border: const OutlineInputBorder(),
                   ),
                   validator: (v) => (v == null || v.isEmpty) ? 'Wajib diisi' : null,
-                  onChanged: (_) => setState(() {}), // Trigger rebuild untuk checklist
+                  onChanged: (_) => setState(() {}),
                 ),
                 const SizedBox(height: 8),
-                // ✅ PASSWORD CRITERIA CHECKLIST
                 PasswordCriteriaList(password: password),
                 const SizedBox(height: 16),
                 
@@ -141,7 +193,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     labelText: 'Konfirmasi Password',
                     prefixIcon: const Icon(Icons.lock_outline, color: AppColors.primary),
                     suffixIcon: IconButton(
-                      icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility, color: AppColors.primary),
+                      icon: Icon(
+                        _obscureConfirmPassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                        color: AppColors.primary,
+                      ),
                       onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                     ),
                     border: const OutlineInputBorder(),
@@ -150,15 +205,27 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
                 const SizedBox(height: 32),
                 
-                // Register Button - Full Width
+                // Register Button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: authState.isLoading ? null : _handleRegister,
-                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
                     child: authState.isLoading
-                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Text('DAFTAR', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'DAFTAR',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
                   ),
                 ),
                 
@@ -166,10 +233,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('Sudah punya akun? ', style: TextStyle(color: AppColors.textSecondary)),
+                    const Text(
+                      'Sudah punya akun? ',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
                     TextButton(
                       onPressed: () => context.pop(),
-                      child: const Text('Login', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Login',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ],
                 ),

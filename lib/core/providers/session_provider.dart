@@ -1,128 +1,143 @@
-// lib/core/providers/session_provider.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/storage_service.dart';
 import '../constants/session_config.dart';
 import '../router/app_router.dart';
-import '../../features/auth/providers/auth_provider.dart'; // ✅ Import authProvider
+import '../../features/auth/providers/auth_provider.dart';
 
-/// Provider untuk session timer
-final sessionTimerProvider = Provider.autoDispose<SessionTimer>((ref) {
-  return SessionTimer(ref);
+// ✅ PERBAIKAN 1: Tambahkan onDispose agar Timer benar-benar dihancurkan 
+// saat pindah halaman/logout, mencegah Ghost Timer dan Memory Leak.
+final sessionTimerProvider = Provider<SessionTimer>((ref) {
+  final timer = SessionTimer(ref);
+  ref.onDispose(() {
+    timer.dispose();
+  });
+  return timer;
 });
 
 class SessionTimer {
   Timer? _timer;
   final StorageService _storageService = StorageService();
   final Ref _ref;
+  bool _isNavigating = false;
 
   SessionTimer(this._ref);
 
-  /// Mulai timer
   void startSessionCheck() {
     _timer?.cancel();
-    // Cek setiap 15 detik
+    _timer = null;
+    _isNavigating = false;
+
     _timer = Timer.periodic(const Duration(seconds: 15), (timer) {
       _checkSession();
     });
-    print('⏰ Session timer dimulai (cek setiap 15 detik)');
-    print('⏱️ Session timeout: ${SessionConfig.sessionTimeout.inMinutes} menit');
   }
 
-  /// Hentikan timer
   void stopSessionCheck() {
     _timer?.cancel();
-    print('⏰ Session timer dihentikan');
+    _timer = null;
+    _isNavigating = false;
   }
 
-  /// Cek session
   void _checkSession() {
+    if (_isNavigating) return;
+
     final isLoggedIn = _storageService.isLoggedIn();
-    print('🔍 Cek session: isLoggedIn=$isLoggedIn');
-    
-    final isExpired = _storageService.isSessionExpired();
-    
+
+    // ✅ PERBAIKAN 2: Jika user sudah tidak login (misal habis logout manual),
+    // cukup matikan timer. JANGAN panggil _navigateToLogin() untuk memunculkan layar expired!
     if (!isLoggedIn) {
-      print('❌ Tidak ada session!');
       _timer?.cancel();
-      _navigateToLogin();
-      return;
+      _timer = null;
+      return; 
     }
-    
+
+    final isExpired = _storageService.isSessionExpired();
+
     if (isExpired) {
-      print('❌ Session EXPIRED!');
-      
-      // 1. Hapus Hive
+      _isNavigating = true;
+
       _storageService.clearSession();
-      print('   Hive session dihapus');
-      
-      // 2. Stop timer
       _timer?.cancel();
-      
-      // 3. ✅ RESET AUTH STATE RIVERPOD
+      _timer = null;
+
       try {
         _ref.read(authProvider.notifier).resetState();
-        print('   AuthState Riverpod di-reset');
       } catch (e) {
-        print('   ❌ Gagal reset AuthState: $e');
+        // ignore
       }
-      
-      // 4. Navigasi ke login
+
       _navigateToLogin();
-    } else {
-      final remaining = _storageService.getSessionRemainingTime();
-      if (remaining != null) {
-        print('✅ Session aktif - Sisa: ${remaining.inMinutes}m ${remaining.inSeconds.remainder(60)}s');
-      }
     }
   }
 
-  /// Navigasi ke login
   void _navigateToLogin() {
-    print('🔄 Mencoba navigasi ke login...');
-    
     final navigator = rootNavigatorKey.currentState;
-    print('   rootNavigatorKey.currentState = $navigator');
-    
+
     if (navigator != null) {
-      print('   Menggunakan Navigator.pushAndRemoveUntil');
+      final timeoutMinutes = SessionConfig.sessionTimeout.inMinutes;
       navigator.pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const SessionExpiredPage()),
+        MaterialPageRoute(
+          builder: (_) => SessionExpiredPage(timeoutMinutes: timeoutMinutes),
+        ),
         (route) => false,
       );
     } else {
-      print('   Navigator null, mencoba GoRouter...');
       try {
         appRouter.go('/auth');
       } catch (e) {
-        print('   ❌ Gagal navigasi: $e');
+        // ignore
       }
     }
   }
+
+  void dispose() {
+    _timer?.cancel();
+    _timer = null;
+  }
 }
 
-/// Halaman session expired
 class SessionExpiredPage extends StatefulWidget {
-  const SessionExpiredPage({super.key});
+  final int timeoutMinutes;
+
+  const SessionExpiredPage({super.key, required this.timeoutMinutes});
 
   @override
   State<SessionExpiredPage> createState() => _SessionExpiredPageState();
 }
 
 class _SessionExpiredPageState extends State<SessionExpiredPage> {
-  @override
-  void initState() {
-    super.initState();
-    print('📄 SessionExpiredPage ditampilkan');
+  bool _isNavigating = false;
+
+  void _goToLogin() {
+    if (_isNavigating) return;
     
-    // Auto redirect setelah 1.5 detik
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) {
-        print('🔄 Auto-redirect ke /auth...');
-        appRouter.go('/auth');
-      }
+    // ✅ PERBAIKAN 3: Bungkus dengan setState agar UI benar-benar merender animasi loading
+    setState(() {
+      _isNavigating = true;
     });
+
+    try {
+      appRouter.go('/auth');
+    } catch (e) {
+      // ✅ Matikan loading jika gagal
+      if (mounted) {
+        setState(() {
+          _isNavigating = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Silakan buka ulang aplikasi untuk login kembali.'),
+            duration: const Duration(seconds: 5),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -158,7 +173,7 @@ class _SessionExpiredPageState extends State<SessionExpiredPage> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Sesi Anda telah berakhir setelah\n${SessionConfig.sessionTimeout.inMinutes} menit tidak aktif.',
+                'Sesi Anda telah berakhir setelah\n${widget.timeoutMinutes} menit tidak aktif.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 15,
@@ -170,19 +185,13 @@ class _SessionExpiredPageState extends State<SessionExpiredPage> {
               const Text(
                 'Silakan login kembali untuk melanjutkan.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF6B6B6B),
-                ),
+                style: TextStyle(fontSize: 13, color: Color(0xFF6B6B6B)),
               ),
               const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    print('👆 Tombol Login Kembali ditekan');
-                    appRouter.go('/auth');
-                  },
+                  onPressed: _isNavigating ? null : _goToLogin,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFC9A334),
                     foregroundColor: Colors.white,
@@ -191,13 +200,19 @@ class _SessionExpiredPageState extends State<SessionExpiredPage> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  child: const Text(
-                    'Login Kembali',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: _isNavigating
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Login Kembali',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
                 ),
               ),
             ],

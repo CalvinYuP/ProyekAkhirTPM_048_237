@@ -9,6 +9,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
 import '../../../../core/services/storage_service.dart';
 import '../../../../data/models/destination_model.dart';
+import '../../../../core/providers/session_provider.dart';
 
 class FavoriteItem {
   final String id;
@@ -65,19 +66,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _logout() async {
-    showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator(color: AppColors.primary)));
-    try {
-      ref.read(authProvider.notifier).logout();
-      final storage = StorageService();
-      await storage.clearSession();
-      await Future.delayed(const Duration(milliseconds: 300));
-      if (mounted) context.go('/auth');
-    } catch (e) {
-      debugPrint("Logout Error: $e");
-    } finally {
-      if (mounted && Navigator.canPop(context)) Navigator.pop(context);
-    }
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const Center(
+      child: CircularProgressIndicator(color: AppColors.primary),
+    ),
+  );
+  try {
+    // ✅ 1. Hentikan session timer
+    ref.read(sessionTimerProvider).stopSessionCheck();
+    
+    // ✅ 2. Reset AuthState Riverpod (set isAuthenticated = false)
+    ref.read(authProvider.notifier).resetState();
+    
+    // ✅ 3. Logout dari auth service (hapus session Hive)
+    ref.read(authProvider.notifier).logout();
+    
+    // ✅ 4. Clear session tambahan
+    final storage = StorageService();
+    await storage.clearSession();
+
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (mounted) context.go('/auth');
+  } catch (e) {
+    debugPrint("Logout Error: $e");
+  } finally {
+    if (mounted && Navigator.canPop(context)) Navigator.pop(context);
   }
+}
 
   Future<void> _pickImage() async {
     final picked = await _picker.pickImage(source: ImageSource.gallery);

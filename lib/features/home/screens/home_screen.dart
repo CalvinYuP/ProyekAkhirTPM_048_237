@@ -27,6 +27,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   StreamSubscription? _accelerometerSub;
   bool _isShaking = false;
   DateTime? _lastShakeTime;
+  bool _sessionCheckStarted = false; // ✅ Flag untuk mencegah restart berulang
 
   @override
   void initState() {
@@ -35,11 +36,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _startSessionCheck();
   }
 
-  /// ✅ Mulai pengecekan session timeout
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // ✅ Restart session timer setiap kali Home Screen ditampilkan kembali
+    _restartSessionCheck();
+  }
+
+  /// ✅ Mulai pengecekan session timeout (hanya sekali)
   void _startSessionCheck() {
+    if (_sessionCheckStarted) return;
+    _sessionCheckStarted = true;
+    
     final sessionTimer = ref.read(sessionTimerProvider);
     sessionTimer.startSessionCheck();
     print('🔒 Session check dimulai di Home Screen');
+  }
+
+  /// ✅ Restart session timer (setiap kali halaman muncul)
+  void _restartSessionCheck() {
+    final sessionTimer = ref.read(sessionTimerProvider);
+    sessionTimer.stopSessionCheck();
+    sessionTimer.startSessionCheck();
+    print('🔄 Session timer di-restart');
   }
 
   // ✅ FITUR SHAKE UNTUK DESTINASI RANDOM

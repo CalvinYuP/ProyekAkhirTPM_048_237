@@ -5,7 +5,7 @@ class SessionConfig {
   // Untuk produksi: Duration(hours: 24) atau Duration(days: 1)
   // Untuk demo: Duration(minutes: 5) atau Duration(minutes: 1)
   
-  static const Duration sessionTimeout = Duration(minutes: 10); // 1 hari (produksi)
+  static const Duration sessionTimeout = Duration(minutes: 100); // 1 hari (produksi)
   // static const Duration sessionTimeout = Duration(minutes: 5); // 5 menit (demo)
   // static const Duration sessionTimeout = Duration(minutes: 1); // 1 menit (demo cepat)
   
